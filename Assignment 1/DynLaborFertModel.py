@@ -17,7 +17,7 @@ class DynLaborFertModelClass(EconModelClass):
 
         pass
 
-    def setup(self):
+    def setup(self, spouse = False):
         """ set baseline parameters """
 
         # unpack
@@ -32,7 +32,7 @@ class DynLaborFertModelClass(EconModelClass):
         par.beta_1 = 0.05 # additional weight on labor dis-utility (children)
         par.eta = -2.0 # CRRA coefficient
         par.gamma = 2.5 # curvature on labor hours 
-        par.theta = 0.05 #Childcare cost
+        par.theta = 0.0 #Childcare cost
 
         # income
         par.alpha = 0.1 # human capital accumulation 
@@ -46,12 +46,13 @@ class DynLaborFertModelClass(EconModelClass):
         par.r = 0.02 # interest rate
 
         #Partner income
-        par.spouse = False
-        par.y_t=0
-        if par.spouse == True:
+        
+        if spouse == True:
             par.y_t = lambda t: 0.1+0.1*t
         else:
-            par.y_t= 0
+            par.y_t = lambda t: 0*t    
+
+
 
 
         # grids
@@ -171,12 +172,11 @@ class DynLaborFertModelClass(EconModelClass):
                         sol.h[idx] = res.x[1]
                         sol.V[idx] = -res.fun
 
-
     # last period
     def cons_last(self,hours,assets,capital):
         par = self.par
 
-        income = self.wage_func(capital,par.T-1) * hours
+        income = self.wage_func(capital,par.T-1) * hours + par.y_t(par.T-1)
         cons = assets + income 
         return cons
 
@@ -204,7 +204,8 @@ class DynLaborFertModelClass(EconModelClass):
         util = self.util(cons,hours,kids)
         
         # d. *expected* continuation value from savings
-        income = self.wage_func(capital,t) * hours
+        income = self.wage_func(capital,t) * hours + par.y_t(t)
+
         a_next = (1.0+par.r)*(assets + income - cons)
         k_next = capital + hours
 
@@ -232,7 +233,7 @@ class DynLaborFertModelClass(EconModelClass):
     def util(self,c,hours,kids):
         par = self.par
 
-        beta = par.beta_0 + par.beta_1*kids
+        beta = par.beta_0 + par.beta_1*kids*par.theta
 
         return (c)**(1.0+par.eta) / (1.0+par.eta) - beta*(hours)**(1.0+par.gamma) / (1.0+par.gamma) 
 
@@ -268,7 +269,9 @@ class DynLaborFertModelClass(EconModelClass):
 
                 # iii. store next-period states
                 if t<par.simT-1:
-                    income = self.wage_func(sim.k[i,t],t)*sim.h[i,t]
+
+                    income = self.wage_func(sim.k[i,t],t)*sim.h[i,t] + par.y_t(t)
+
                     sim.a[i,t+1] = (1+par.r)*(sim.a[i,t] + income - sim.c[i,t])
                     sim.k[i,t+1] = sim.k[i,t] + sim.h[i,t]
 
